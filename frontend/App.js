@@ -11,10 +11,7 @@ import {
 } from 'react-native';
 import { Camera, CameraType } from 'expo-camera';
 import * as Speech from 'expo-speech';
-
-// Update this to your computer's local IP address (find it with ipconfig on Windows)
-// Example: if your computer is at 192.168.1.100, use that IP
-const BACKEND_URL = 'http://192.168.1.85:8000/detect/';
+import { BACKEND_URL } from './config';
 
 export default function App() {
   const [hasPermission, setHasPermission] = useState('pending');

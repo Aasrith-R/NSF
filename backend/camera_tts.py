@@ -7,12 +7,23 @@ import asyncio
 import httpx
 import os
 from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()  # loads .env file into environment variables
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 yolo_model = YOLO("yolov8n.pt")
 
 def get_direction(bbox, width):
@@ -43,9 +54,13 @@ async def query_gemini(detected_objects):
             f"risk: {obj['risk']}, direction: {obj['direction']}\n"
         )
     prompt += "\nRespond in 1–2 short sentences, with urgent risks first."
+    
+    if not GEMINI_API_KEY:
+        return "API key not configured. Please set GEMINI_API_KEY in your .env file."
+    
     url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
     )
     json_data = {
         "contents": [
@@ -54,7 +69,11 @@ async def query_gemini(detected_objects):
     }
     async with httpx.AsyncClient() as client:
         response = await client.post(url, json=json_data)
-        response.raise_for_status()
+        if response.status_code != 200:
+            error_detail = response.text
+            print(f"Gemini API error: {response.status_code} - {error_detail}")
+            # Return a fallback message instead of crashing
+            return f"Warning: {len(detected_objects)} object(s) detected nearby. Please proceed with caution."
         data = response.json()
         return data["candidates"][0]["content"]["parts"][0]["text"]
 
@@ -103,7 +122,18 @@ async def detect(file: UploadFile = File(...)):
         "alert_text": alert_text
     }
 
+@app.post("/process-audio/")
+async def process_audio_endpoint(file: UploadFile = File(...)):
+    """Process audio for speaker separation and spatial captioning"""
+    try:
+        from audio_processing import process_audio
+        return await process_audio(file)
+    except ImportError as e:
+        return {
+            "error": f"Audio processing module not available: {str(e)}",
+            "speakers": []
+        }
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

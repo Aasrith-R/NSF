@@ -12,8 +12,7 @@ import { StatusBar } from 'expo-status-bar';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Speech from 'expo-speech';
-
-const BACKEND_URL = 'http://192.168.1.85:8000/detect/';
+import { BACKEND_URL } from '../../config';
 
 type Detection = {
   label: string;
